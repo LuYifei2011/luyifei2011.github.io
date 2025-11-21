@@ -17,17 +17,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare `/` directory and write INDEXNOW key
+      - name: Prepare `public/` directory and write INDEXNOW key
         run: |
           set -e
           mkdir -p public
-          rsync -a --exclude='.git' --exclude='.github' --exclude='.gitignore' ./ /
-          echo "${{ secrets.INDEXNOW_KEY }}" > ${{ secrets.INDEXNOW_KEY }}.txt
+          rsync -a --exclude='.git' --exclude='.github' --exclude='.gitignore' --exclude='public' ./ public/
+          echo "${{ secrets.INDEXNOW_KEY }}" > public/${{ secrets.INDEXNOW_KEY }}.txt
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v4
         with:
           path: public
 
       - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v2
