@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://luyifei2011.github.io/scratch-modules-gallery/</loc>
-    <lastmod>2025-11-22</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-</urlset>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://luyifei2011.github.io/scratch-modules-gallery/sitemap.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://luyifei2011.github.io/sitemap-1.xml</loc>
+  </sitemap>
+</sitemapindex>
