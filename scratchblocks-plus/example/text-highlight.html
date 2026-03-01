@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Text Highlight Example - scratchblocks-plus</title>
+  <meta name="description" content="Click text to highlight blocks - scratchblocks-plus example" />
+
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Noto+Sans:400,700" />
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=JetBrains+Mono" />
+  <link rel="stylesheet" href="../style.css" />
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    .appbar {
+      display: flex;
+      align-items: center;
+      gap: 1em;
+      padding: 1em 2em;
+      background: #4ca6fb;
+      color: white;
+    }
+
+    .example-container {
+      margin: 0;
+      width: 100vw;
+    }
+
+    .example-section {
+      margin: 2em 0;
+      padding: 2em;
+      background: #f9f9f9;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .example-section {
+        background: #2a2a2a;
+        border-color: #444;
+      }
+    }
+
+    .blocks-wrapper {
+      margin: 1.5em 0;
+      padding: 1.5em;
+      background: white;
+      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+      overflow-x: auto;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .blocks-wrapper {
+        background: #1e1e1e;
+        border-color: #333;
+      }
+    }
+
+    .explanation {
+      margin-top: 1.5em;
+      padding: 1.5em;
+      background: white;
+      border-radius: 6px;
+      border-left: 4px solid #4ca6fb;
+      line-height: 1.8;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .explanation {
+        background: #1e1e1e;
+        border-left-color: #4ca6fb;
+      }
+    }
+
+    .highlight-word {
+      cursor: pointer;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 3px;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .highlight-word:hover {
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .highlight-word:hover {
+        background: rgba(76, 166, 251, 0.2);
+        color: #4ca6fb;
+      }
+    }
+
+    .blocks {
+      margin: 0;
+      padding: 0;
+    }
+
+    a.back-link {
+      display: inline-block;
+      margin-left: auto;
+      margin-right: 0;
+    }
+
+    a.back-link:hover {
+      text-decoration: underline;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2em;
+    }
+
+    @media (max-width: 768px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .config {
+      display: flex;
+      align-items: center;
+      gap: 1em;
+      margin: 2em;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="example-container">
+    <div class="appbar">
+      <div>
+        <div style="font-size:1.3em;font-weight:700;letter-spacing:0.5px;">Click to Highlight Example</div>
+        <div style="font-size:0.98em;font-weight:400;opacity:0.92;margin-top:0.2em;">Click the keywords on the right to highlight corresponding blocks on the left.</div>
+      </div>
+      <a href="../" class="back-link" style="color:#fff;">Back to Home</a>
+    </div>
+
+    <div class="config">
+      <input type="checkbox" id="enable-click" checked />
+      <label for="enable-click">Click Highlight</label>
+      <input type="checkbox" id="enable-hover" />
+      <label for="enable-hover">Hover Highlight</label>
+    </div>
+
+    <div class="example-section">
+      <div class="layout">
+        <div>
+          <h3>Program Script</h3>
+          <div class="blocks-wrapper">
+            <pre id="script-blocks" class="blocks"></pre>
+          </div>
+        </div>
+
+        <div>
+          <h3>Explanation Text</h3>
+          <div class="explanation">
+            <p>
+              When the <span class="highlight-word" data-path="1.1">green flag is clicked</span>, the program starts running.
+            </p>
+            <p>
+              Then this <span class="highlight-word" data-path="1.2">repeat loop</span> executes 4 times.
+            </p>
+            <p>
+              Inside the loop, the sprite first <span class="highlight-word" data-path="1.2.1.1">moves 10 steps</span>.
+            </p>
+            <p>
+              Next, <span class="highlight-word" data-path="1.2.1.2">turns right 15 degrees</span> to change direction.
+            </p>
+            <p>
+              Finally, <span class="highlight-word" data-path="1.2.1.3">waits 1 second</span>, then repeats the loop.
+            </p>
+            <p style="margin-top: 2em; padding-top: 1em; border-top: 1px solid #ddd;">
+              💡 Try clicking the bold words above!
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../lib/scratchblocks-plus.min.js"></script>
+  <script>
+    let scriptView = null;
+
+    // 完整的 Scratch 脚本
+    const scriptCode = `when green flag clicked
+repeat (4)
+  move (10) steps
+  turn right (15) degrees
+  wait (1) seconds
+end`;
+
+    // 初始化脚本渲染
+    function initializeScript() {
+      const container = document.getElementById("script-blocks");
+
+      try {
+        // 解析脚本
+        const doc = scratchblocks.parse(scriptCode, {
+          languages: ["en"]
+        });
+
+        // 创建视图
+        scriptView = scratchblocks.newView(doc, {
+          style: "scratch3",
+          scale: 0.85
+        });
+
+        // 渲染为 SVG
+        const svg = scriptView.render();
+        container.innerHTML = "";
+        container.appendChild(svg);
+      } catch (error) {
+        console.error("Failed to render script:", error);
+        container.innerHTML = "<p>Error rendering script</p>";
+      }
+    }
+
+    // 设置高亮功能
+    function setupHighlighting() {
+      const highlightWords = document.querySelectorAll(".highlight-word");
+
+      highlightWords.forEach(word => {
+        word.addEventListener("click", function (e) {
+          if (!document.getElementById("enable-click").checked) return;
+
+          e.preventDefault();
+          const path = this.dataset.path;
+
+          // 清除所有高亮
+          if (scriptView) {
+            scratchblocks.clearHighlight(scriptView);
+          }
+
+          // 高亮对应的块
+          if (scriptView && path) {
+            const success = scratchblocks.highlightBlock(scriptView, path, {
+              blink: true,
+              colorShift: false
+            });
+
+            if (!success) {
+              console.warn(`Failed to highlight block at path: ${path}`);
+            }
+          }
+        });
+
+        // 鼠标悬停高亮
+        word.addEventListener("mouseenter", function () {
+          if (!document.getElementById("enable-hover").checked) return;
+
+          const path = this.dataset.path;
+          if (scriptView && path) {
+            scratchblocks.highlightBlock(scriptView, path, {
+              blink: false,
+              colorShift: false
+            });
+          }
+        });
+
+        word.addEventListener("mouseleave", function () {
+          if (!document.getElementById("enable-hover").checked) return;
+
+          if (scriptView) {
+            scratchblocks.clearHighlight(scriptView);
+          }
+        });
+      });
+    }
+
+    // 页面加载完毕后初始化
+    window.addEventListener("DOMContentLoaded", function () {
+      initializeScript();
+      setupHighlighting();
+    });
+  </script>
+</body>
+
+</html>
