@@ -705,4 +705,9 @@ img .hidden {
   p a:hover {
     border-bottom-color: #4ca6fb;
   }
+
+  /* Overrides for scratchblocks diff in dark mode */
+  .sb3-diff {
+    stroke: #fff !important;
+  }
 }
