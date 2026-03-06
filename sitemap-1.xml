@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://luyifei2011.github.io/index.html</loc>
-    <xhtml:link rel="alternate" hreflang="en-US" href="https://luyifei2011.github.io/en.html" />
-    <lastmod>2026-2-28</lastmod>
+    <loc>https://luyifei2011.github.io</loc>
+    <xhtml:link rel="alternate" hreflang="en-US" href="https://luyifei2011.github.io/en" />
+    <lastmod>2026-02-28</lastmod>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://luyifei2011.github.io/scratchblocks-plus/index.html</loc>
-    <lastmod>2026-1-17</lastmod>
-    <priority>0.9</priority>
+    <loc>https://luyifei2011.github.io/scratchblocks-plus</loc>
+    <lastmod>2026-01-17</lastmod>
+    <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://luyifei2011.github.io/scratchblocks-plus/translator/index.html</loc>
-    <lastmod>2026-1-17</lastmod>
+    <loc>https://luyifei2011.github.io/scratchblocks-plus/translator</loc>
+    <lastmod>2026-01-17</lastmod>
     <priority>0.8</priority>
   </url>
 </urlset>
