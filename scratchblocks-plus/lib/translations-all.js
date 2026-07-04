@@ -1,5 +1,5 @@
 /**
- * scratchblocks-plus v1.3.0
+ * scratchblocks-plus v1.3.1
  * https://luyifei2011.github.io/scratchblocks-plus
  * Make pictures of Scratch blocks from text.
  *
