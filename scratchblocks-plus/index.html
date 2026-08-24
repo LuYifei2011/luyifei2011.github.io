@@ -26,8 +26,47 @@
         <a href="./examples/">examples</a>
         <a href="./translator/" id="translate-link"><b>translate</b></a>
         <button id="format-btn">format code</button>
+        <button id="extension-btn">load extension</button>
       </span>
     </h1>
+
+    <dialog id="extension-dialog" aria-labelledby="extension-dialog-title">
+      <div class="dialog-heading">
+        <div>
+          <h2 id="extension-dialog-title">TurboWarp extensions</h2>
+          <p>Load block metadata only. Block functions are not run.</p>
+        </div>
+        <button id="extension-close" class="icon-button" aria-label="Close">×</button>
+      </div>
+
+      <div class="extension-tabs" role="tablist" aria-label="Extension source type">
+        <button type="button" role="tab" aria-selected="true" data-extension-tab="url">URL</button>
+        <button type="button" role="tab" aria-selected="false" data-extension-tab="source">Source code</button>
+      </div>
+
+      <section class="extension-input-panel" data-extension-panel="url">
+        <div class="extension-url-heading">
+          <label for="extension-url">Public JavaScript URL</label>
+          <a href="https://extensions.turbowarp.org/" target="_blank" rel="noopener noreferrer">TurboWarp Extension Gallery</a>
+        </div>
+        <div class="extension-input-row">
+          <input id="extension-url" type="url" placeholder="https://extensions.turbowarp.org/..." />
+          <button id="extension-add-url" type="button">load</button>
+        </div>
+        <small>The server must allow cross-origin requests.</small>
+      </section>
+
+      <section class="extension-input-panel hidden" data-extension-panel="source">
+        <label for="extension-source">TurboWarp extension source</label>
+        <textarea id="extension-source" rows="8" spellcheck="false" placeholder="class MyExtension {&#013;  // ...&#013;}&#013;Scratch.extensions.register(new MyExtension());"></textarea>
+        <button id="extension-add-source" type="button">save and load</button>
+        <small>Source is stored only in this browser and is not added to shared links.</small>
+      </section>
+
+      <p id="extension-message" class="extension-message" aria-live="polite"></p>
+      <h3>Configured extensions</h3>
+      <div id="extension-list" class="extension-list"></div>
+    </dialog>
 
     <div id="side">
       <div>
@@ -58,14 +97,18 @@
     <script src="./lib/scratchblocks-plus.min.js"></script>
     <script src="./lib/translations-all.js" charset="utf8"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
+    <script src="./turbowarp-extension-loader.js"></script>
 
     <script>
       var editor = document.getElementById("editor");
+      var preview = document.getElementById("preview");
       var exportSVGLink = document.getElementById("export-svg");
       var exportPNGLink = document.getElementById("export-png");
+      var SOURCE_STORAGE_KEY = "scratchblocks-plus:turbowarp-extension-sources:v1";
 
       var obj = {
         style: "scratch3",
+        extensions: [],
       };
       extractHash();
 
@@ -152,6 +195,7 @@
         if (obj.lang === chooseLang.value) return;
         obj.lang = chooseLang.value;
         objUpdated();
+        renderExtensionList();
       });
 
       var chooseStyle = document.getElementById("choose-style");
@@ -165,16 +209,25 @@
       /* Extract hash from location. Returns true if changed */
       function extractHash() {
         var newObj = decodeHash();
-        if (!newObj || !newObj.script) {
+        if (!newObj) {
           newObj = {
             script: "",
-            lang: obj.lang,
+            lang: "",
+            extensions: [],
           };
         }
 
+        newObj.script = newObj.script || "";
         newObj.style = newObj.style || obj.style || "scratch3";
+        newObj.lang = newObj.lang || "";
+        newObj.extensions = newObj.extensions || [];
 
-        if (newObj.lang !== obj.lang || newObj.script !== obj.script) {
+        if (
+          newObj.lang !== obj.lang ||
+          newObj.script !== obj.script ||
+          newObj.style !== obj.style ||
+          newObj.extensions.join("\n") !== (obj.extensions || []).join("\n")
+        ) {
           obj = newObj;
           return true;
         }
@@ -188,10 +241,11 @@
         if (!/^\?/.test(hash)) {
           return {
             script: decodeURIComponent(hash),
+            extensions: [],
           };
         } else {
-          var newObj = {};
-          parts = hash.slice(1).split("&");
+          var newObj = { extensions: [] };
+          var parts = hash.slice(1).split("&");
           parts.forEach(function (part) {
             var match = /^(.*)=(.*)$/.exec(part);
             if (!match) return;
@@ -199,6 +253,10 @@
             var value = decodeURIComponent(match[2]);
             if (key === "lang" || key === "script" || key === "style") {
               newObj[key] = value;
+            } else if (key === "extension") {
+              if (newObj.extensions.indexOf(value) === -1) {
+                newObj.extensions.push(value);
+              }
             }
           });
           return newObj;
@@ -214,24 +272,14 @@
       }
 
       function objUpdated() {
-        // set hash
-        if (obj.lang || obj.style) {
-          var hash = "#?";
-          if (obj.style) hash += "style=" + encodeURIComponent(obj.style) + "&";
-          if (obj.lang) hash += "lang=" + encodeURIComponent(obj.lang) + "&";
-          hash += "script=" + encodeURIComponent(obj.script);
-          setHash(hash);
-        } else if (obj.style) {
-          setHash("#?lang=" + encodeURIComponent(obj.lang) + "&script=" + encodeURIComponent(obj.script));
-        } else if (obj.lang) {
-          setHash("#?lang=" + encodeURIComponent(obj.lang) + "&script=" + encodeURIComponent(obj.script));
-        } else if (obj.script) {
-          setHash("#" + encodeURIComponent(obj.script));
-        } else {
-          if (!(location.hash == "" || location.hash == "#")) {
-            setHash("#");
-          }
-        }
+        var hashParts = [];
+        if (obj.style) hashParts.push("style=" + encodeURIComponent(obj.style));
+        if (obj.lang) hashParts.push("lang=" + encodeURIComponent(obj.lang));
+        (obj.extensions || []).forEach(function (url) {
+          hashParts.push("extension=" + encodeURIComponent(url));
+        });
+        hashParts.push("script=" + encodeURIComponent(obj.script || ""));
+        setHash("#?" + hashParts.join("&"));
 
         // render code
         var doc = (window.doc = scratchblocks.parse(obj.script, {
@@ -284,9 +332,297 @@
         codeMirror.setValue(obj.script);
         chooseLang.value = obj.lang || "";
         chooseStyle.value = obj.style || "";
+        syncURLDescriptors();
       }
 
+      var extensionDialog = document.getElementById("extension-dialog");
+      var extensionMessage = document.getElementById("extension-message");
+      var extensionList = document.getElementById("extension-list");
+      var extensionStates = Object.create(null);
+      var localSources = readLocalSources();
+      var extensionsInitialized = false;
+
+      function readLocalSources() {
+        try {
+          var parsed = JSON.parse(localStorage.getItem(SOURCE_STORAGE_KEY) || "[]");
+          if (!Array.isArray(parsed)) return [];
+          return parsed.filter(function (entry) {
+            return entry && typeof entry.key === "string" && typeof entry.source === "string";
+          });
+        } catch (_error) {
+          return [];
+        }
+      }
+
+      function writeLocalSources() {
+        localStorage.setItem(SOURCE_STORAGE_KEY, JSON.stringify(localSources));
+      }
+
+      function stateKey(descriptor) {
+        return descriptor.type + ":" + descriptor.key;
+      }
+
+      function ensureDescriptor(descriptor) {
+        var key = stateKey(descriptor);
+        if (!extensionStates[key]) {
+          extensionStates[key] = {
+            descriptor: descriptor,
+            status: "pending",
+            id: null,
+            name: descriptor.type === "url" ? descriptor.url : "Saved source",
+            warnings: [],
+          };
+        }
+        return extensionStates[key];
+      }
+
+      function allDescriptors() {
+        var descriptors = localSources.map(function (entry) {
+          return { type: "source", key: entry.key, source: entry.source };
+        });
+        (obj.extensions || []).forEach(function (url) {
+          descriptors.push({ type: "url", key: url, url: url });
+        });
+        return descriptors;
+      }
+
+      function setExtensionMessage(message, isError) {
+        extensionMessage.textContent = message || "";
+        extensionMessage.classList.toggle("error", Boolean(isError));
+      }
+
+      function renderExtensionList() {
+        extensionList.innerHTML = "";
+        var descriptors = allDescriptors();
+        if (descriptors.length === 0) {
+          var empty = document.createElement("p");
+          empty.className = "extension-empty";
+          empty.textContent = "No custom extensions configured.";
+          extensionList.appendChild(empty);
+          return;
+        }
+
+        descriptors.forEach(function (descriptor) {
+          var state = ensureDescriptor(descriptor);
+          var item = document.createElement("article");
+          item.className = "extension-item extension-status-" + state.status;
+
+          var summary = document.createElement("div");
+          summary.className = "extension-item-summary";
+          var text = document.createElement("div");
+          var title = document.createElement("strong");
+          var localizedName = state.localizedNames && Object.keys(state.localizedNames).find(function (language) {
+            return language.toLowerCase().replace(/_/g, "-") === (obj.lang || "").toLowerCase().replace(/_/g, "-");
+          });
+          var displayName = localizedName ? state.localizedNames[localizedName] : state.name;
+          title.textContent = state.blockCount == null
+            ? displayName
+            : displayName + " (" + state.blockCount + " blocks)";
+          var source = document.createElement("small");
+          source.textContent = descriptor.type === "url" ? descriptor.url : "Saved in this browser";
+          text.appendChild(title);
+          if (state.id) {
+            var extensionId = document.createElement("small");
+            extensionId.className = "extension-id";
+            extensionId.textContent = "ID: " + state.id;
+            text.appendChild(extensionId);
+          }
+          text.appendChild(source);
+
+          var badge = document.createElement("span");
+          badge.className = "extension-badge";
+          badge.textContent = state.status === "loaded" && state.warnings.length ? "partial" : state.status;
+          summary.appendChild(text);
+          summary.appendChild(badge);
+          item.appendChild(summary);
+
+          if (state.error) {
+            var error = document.createElement("p");
+            error.className = "extension-error";
+            error.textContent = state.error;
+            item.appendChild(error);
+          }
+          if (state.warnings.length) {
+            var details = document.createElement("details");
+            var detailsSummary = document.createElement("summary");
+            detailsSummary.textContent = state.warnings.length + " warning" + (state.warnings.length === 1 ? "" : "s");
+            var warnings = document.createElement("ul");
+            state.warnings.forEach(function (warning) {
+              var warningItem = document.createElement("li");
+              warningItem.textContent = warning;
+              warnings.appendChild(warningItem);
+            });
+            details.appendChild(detailsSummary);
+            details.appendChild(warnings);
+            item.appendChild(details);
+          }
+
+          var actions = document.createElement("div");
+          actions.className = "extension-actions";
+          if (state.status === "failed") {
+            var retry = document.createElement("button");
+            retry.type = "button";
+            retry.textContent = "retry";
+            retry.addEventListener("click", function () {
+              loadDescriptor(descriptor);
+            });
+            actions.appendChild(retry);
+          }
+          var remove = document.createElement("button");
+          remove.type = "button";
+          remove.textContent = "remove";
+          remove.addEventListener("click", function () {
+            removeDescriptor(descriptor);
+          });
+          actions.appendChild(remove);
+          item.appendChild(actions);
+          extensionList.appendChild(item);
+        });
+      }
+
+      function loadDescriptor(descriptor) {
+        var state = ensureDescriptor(descriptor);
+        if (state.status === "loading" || state.status === "loaded") return Promise.resolve();
+        state.status = "loading";
+        state.error = "";
+        state.warnings = [];
+        renderExtensionList();
+
+        var promise = descriptor.type === "url"
+          ? TurboWarpExtensionLoader.loadURL(descriptor.url, scratchblocks)
+          : TurboWarpExtensionLoader.loadSource(descriptor.source, scratchblocks);
+        return promise.then(function (result) {
+          state.status = "loaded";
+          state.id = result.id;
+          state.name = result.name;
+          state.localizedNames = result.localizedNames;
+          state.blockCount = result.blockCount;
+          state.warnings = result.warnings;
+          renderExtensionList();
+          objUpdated();
+        }).catch(function (error) {
+          state.status = "failed";
+          state.error = error && error.message ? error.message : String(error);
+          renderExtensionList();
+        });
+      }
+
+      function restoreExtensions() {
+        return allDescriptors().reduce(function (chain, descriptor) {
+          return chain.then(function () {
+            return loadDescriptor(descriptor);
+          });
+        }, Promise.resolve());
+      }
+
+      function syncURLDescriptors() {
+        if (!extensionsInitialized) return;
+        Object.keys(extensionStates).forEach(function (key) {
+          var state = extensionStates[key];
+          if (state.descriptor.type === "url" && obj.extensions.indexOf(state.descriptor.url) === -1) {
+            location.reload();
+          }
+        });
+        (obj.extensions || []).forEach(function (url) {
+          var descriptor = { type: "url", key: url, url: url };
+          var state = ensureDescriptor(descriptor);
+          if (state.status === "pending") loadDescriptor(descriptor);
+        });
+        renderExtensionList();
+      }
+
+      function removeDescriptor(descriptor) {
+        if (descriptor.type === "url") {
+          obj.extensions = obj.extensions.filter(function (url) { return url !== descriptor.url; });
+          objUpdated();
+        } else {
+          localSources = localSources.filter(function (entry) { return entry.key !== descriptor.key; });
+          writeLocalSources();
+        }
+        location.reload();
+      }
+
+      document.getElementById("extension-btn").addEventListener("click", function () {
+        setExtensionMessage("");
+        renderExtensionList();
+        extensionDialog.showModal();
+      });
+      document.getElementById("extension-close").addEventListener("click", function () {
+        extensionDialog.close();
+      });
+      extensionDialog.addEventListener("click", function (event) {
+        if (event.target === extensionDialog) extensionDialog.close();
+      });
+
+      document.querySelectorAll("[data-extension-tab]").forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          var selected = tab.getAttribute("data-extension-tab");
+          document.querySelectorAll("[data-extension-tab]").forEach(function (other) {
+            other.setAttribute("aria-selected", other === tab ? "true" : "false");
+          });
+          document.querySelectorAll("[data-extension-panel]").forEach(function (panel) {
+            panel.classList.toggle("hidden", panel.getAttribute("data-extension-panel") !== selected);
+          });
+        });
+      });
+
+      document.getElementById("extension-add-url").addEventListener("click", function () {
+        var input = document.getElementById("extension-url");
+        var url;
+        try {
+          url = new URL(input.value.trim(), location.href);
+          if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error();
+        } catch (_error) {
+          setExtensionMessage("Enter a valid HTTP(S) JavaScript URL.", true);
+          return;
+        }
+        if (obj.extensions.indexOf(url.href) !== -1) {
+          setExtensionMessage("That extension URL is already configured.", true);
+          return;
+        }
+        obj.extensions.push(url.href);
+        objUpdated();
+        input.value = "";
+        setExtensionMessage("Extension URL added.");
+        loadDescriptor({ type: "url", key: url.href, url: url.href });
+      });
+
+      document.getElementById("extension-add-source").addEventListener("click", function () {
+        var input = document.getElementById("extension-source");
+        var source = input.value.trim();
+        if (!source) {
+          setExtensionMessage("Paste a TurboWarp extension first.", true);
+          return;
+        }
+        if (new Blob([source]).size > TurboWarpExtensionLoader.MAX_SOURCE_BYTES) {
+          setExtensionMessage("Extension source exceeds the 5 MiB limit.", true);
+          return;
+        }
+        var entry = {
+          key: globalThis.crypto && globalThis.crypto.randomUUID
+            ? globalThis.crypto.randomUUID()
+            : String(Date.now()),
+          source: source,
+        };
+        try {
+          localSources.push(entry);
+          writeLocalSources();
+        } catch (_error) {
+          localSources.pop();
+          setExtensionMessage("The source could not be saved. Browser storage may be full.", true);
+          return;
+        }
+        input.value = "";
+        setExtensionMessage("Extension source saved.");
+        loadDescriptor({ type: "source", key: entry.key, source: entry.source });
+      });
+
       updatedFromHash();
+      renderExtensionList();
+      restoreExtensions().finally(function () {
+        extensionsInitialized = true;
+        syncURLDescriptors();
+      });
     </script>
   </body>
 </html>

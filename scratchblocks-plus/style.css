@@ -75,7 +75,8 @@ input[type="url"],
     sans-serif;
 }
 
-#format-btn {
+#format-btn,
+#extension-btn {
   margin-left: 1em;
   padding: 4px 12px;
   font-size: 0.9rem;
@@ -94,17 +95,233 @@ input[type="url"],
   vertical-align: baseline;
 }
 
-#format-btn:hover {
+#format-btn:hover,
+#extension-btn:hover {
   background: #f8f8f8;
   border-color: #999;
   color: #000;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-#format-btn:active {
+#format-btn:active,
+#extension-btn:active {
   background: #f0f0f0;
   top: 1px;
   box-shadow: none;
+}
+
+/* TurboWarp extension loader */
+
+#extension-dialog {
+  width: min(42rem, calc(100vw - 2rem));
+  max-height: min(48rem, calc(100vh - 2rem));
+  overflow: auto;
+  padding: 1.25rem;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  background: #fdfdfd;
+  color: #333;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.24);
+}
+
+#extension-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.45);
+}
+
+#extension-dialog h2,
+#extension-dialog h3,
+#extension-dialog p {
+  margin: 0;
+}
+
+#extension-dialog h2 {
+  font-size: 1.25rem;
+}
+
+#extension-dialog h3 {
+  margin-top: 1.25rem;
+  font-size: 1rem;
+}
+
+#extension-dialog button {
+  margin-bottom: 0;
+}
+
+.dialog-heading,
+.extension-item-summary,
+.extension-input-row,
+.extension-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.dialog-heading,
+.extension-item-summary {
+  justify-content: space-between;
+}
+
+.dialog-heading p,
+.extension-input-panel small,
+.extension-item-summary small {
+  display: block;
+  margin-top: 0.2rem;
+  color: #666;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.icon-button {
+  flex: 0 0 auto;
+  padding: 0.15rem 0.55rem;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 1.5rem;
+}
+
+.extension-tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin: 1.25rem 0 1rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.extension-tabs button {
+  padding: 0.4rem 0.75rem;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.extension-tabs button[aria-selected="true"] {
+  border-bottom-color: #006ed8;
+  color: #006ed8;
+}
+
+.extension-input-panel label {
+  display: block;
+  margin-bottom: 0.4rem;
+}
+
+.extension-url-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.4rem;
+}
+
+.extension-url-heading a {
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.extension-url-heading label {
+  margin-bottom: 0;
+}
+
+.extension-input-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#extension-source {
+  display: block;
+  width: 100%;
+  margin-bottom: 0.65rem;
+  padding: 0.6rem;
+  resize: vertical;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+  color: #333;
+  font-family: "JetBrains Mono", monospace;
+  line-height: 1.4;
+}
+
+.extension-message {
+  min-height: 1.5em;
+  margin-top: 0.8rem !important;
+  color: #287a3e;
+  font-size: 0.85rem;
+}
+
+.extension-message.error,
+.extension-error {
+  color: #b42318;
+}
+
+.extension-list {
+  margin-top: 0.6rem;
+}
+
+.extension-item {
+  margin-top: 0.55rem;
+  padding: 0.7rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.extension-item-summary > div {
+  min-width: 0;
+}
+
+.extension-item-summary strong,
+.extension-item-summary small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.extension-item-summary .extension-id {
+  color: #444;
+  font-family: "JetBrains Mono", monospace;
+}
+
+.extension-badge {
+  flex: 0 0 auto;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #eee;
+  font-size: 0.75rem;
+}
+
+.extension-status-loaded .extension-badge {
+  background: #dff6e5;
+  color: #176b2c;
+}
+
+.extension-status-failed .extension-badge {
+  background: #fee4e2;
+  color: #b42318;
+}
+
+.extension-item details,
+.extension-error {
+  margin-top: 0.55rem !important;
+  font-size: 0.8rem;
+}
+
+.extension-item details ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.extension-actions {
+  justify-content: flex-end;
+  margin-top: 0.55rem;
+}
+
+.extension-actions button {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.8rem;
+}
+
+.extension-empty {
+  color: #777;
+  font-size: 0.85rem;
 }
 
 h1 {
@@ -633,16 +850,20 @@ img .hidden {
   /* Form elements */
   input,
   select,
+  textarea,
   button,
   .button,
-  #format-btn {
+  #format-btn,
+  #extension-btn,
+  #extension-dialog {
     background-color: #2d2d2d;
     border-color: #444;
     color: #e0e0e0;
   }
 
   input:focus,
-  select:focus {
+  select:focus,
+  textarea:focus {
     border-color: #4ca6fb;
     box-shadow: 0 0 0 3px rgba(76, 166, 251, 0.25);
   }
@@ -650,7 +871,8 @@ img .hidden {
   /* Button hover states */
   button:hover,
   .button:hover,
-  #format-btn:hover {
+  #format-btn:hover,
+  #extension-btn:hover {
     background: #383838;
     border-color: #666;
     color: #fff;
@@ -659,8 +881,39 @@ img .hidden {
 
   button:active,
   .button:active,
-  #format-btn:active {
+  #format-btn:active,
+  #extension-btn:active {
     background: #252525;
+  }
+
+  .dialog-heading p,
+  .extension-input-panel small,
+  .extension-item-summary small,
+  .extension-empty {
+    color: #aaa;
+  }
+
+  .extension-item-summary .extension-id {
+    color: #ccc;
+  }
+
+  .extension-tabs,
+  .extension-item {
+    border-color: #444;
+  }
+
+  .extension-badge {
+    background: #444;
+  }
+
+  .extension-status-loaded .extension-badge {
+    background: #173f24;
+    color: #8ee6a3;
+  }
+
+  .extension-status-failed .extension-badge {
+    background: #4b1f1c;
+    color: #ffaaa3;
   }
 
   /* Editor areas */
