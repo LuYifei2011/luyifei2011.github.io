@@ -54,6 +54,11 @@
           <button id="extension-add-url" type="button">load</button>
         </div>
         <small>The server must allow cross-origin requests.</small>
+        <label class="extension-compatibility-option" for="extension-url-compatibility">
+          <input id="extension-url-compatibility" type="checkbox" />
+          Compatibility mode
+        </label>
+        <small class="extension-compatibility-note">Allows dynamic imports and generated code. The extension remains isolated from this page, but it may make network requests. This permission is saved only in this browser.</small>
       </section>
 
       <section class="extension-input-panel hidden" data-extension-panel="source">
@@ -61,6 +66,11 @@
         <textarea id="extension-source" rows="8" spellcheck="false" placeholder="class MyExtension {&#013;  // ...&#013;}&#013;Scratch.extensions.register(new MyExtension());"></textarea>
         <button id="extension-add-source" type="button">save and load</button>
         <small>Source is stored only in this browser and is not added to shared links.</small>
+        <label class="extension-compatibility-option" for="extension-source-compatibility">
+          <input id="extension-source-compatibility" type="checkbox" />
+          Compatibility mode
+        </label>
+        <small class="extension-compatibility-note">Allows dynamic imports and generated code. The extension remains isolated from this page, but it may make network requests.</small>
       </section>
 
       <p id="extension-message" class="extension-message" aria-live="polite"></p>
@@ -105,6 +115,7 @@
       var exportSVGLink = document.getElementById("export-svg");
       var exportPNGLink = document.getElementById("export-png");
       var SOURCE_STORAGE_KEY = "scratchblocks-plus:turbowarp-extension-sources:v1";
+      var COMPATIBILITY_URL_STORAGE_KEY = "scratchblocks-plus:turbowarp-extension-compatibility-urls:v1";
 
       var obj = {
         style: "scratch3",
@@ -340,6 +351,7 @@
       var extensionList = document.getElementById("extension-list");
       var extensionStates = Object.create(null);
       var localSources = readLocalSources();
+      var compatibilityURLs = readCompatibilityURLs();
       var extensionsInitialized = false;
 
       function readLocalSources() {
@@ -348,6 +360,12 @@
           if (!Array.isArray(parsed)) return [];
           return parsed.filter(function (entry) {
             return entry && typeof entry.key === "string" && typeof entry.source === "string";
+          }).map(function (entry) {
+            return {
+              key: entry.key,
+              source: entry.source,
+              mode: entry.mode === "compatibility" ? "compatibility" : "strict",
+            };
           });
         } catch (_error) {
           return [];
@@ -356,6 +374,20 @@
 
       function writeLocalSources() {
         localStorage.setItem(SOURCE_STORAGE_KEY, JSON.stringify(localSources));
+      }
+
+      function readCompatibilityURLs() {
+        try {
+          var parsed = JSON.parse(localStorage.getItem(COMPATIBILITY_URL_STORAGE_KEY) || "[]");
+          if (!Array.isArray(parsed)) return [];
+          return parsed.filter(function (url) { return typeof url === "string"; });
+        } catch (_error) {
+          return [];
+        }
+      }
+
+      function writeCompatibilityURLs() {
+        localStorage.setItem(COMPATIBILITY_URL_STORAGE_KEY, JSON.stringify(compatibilityURLs));
       }
 
       function stateKey(descriptor) {
@@ -372,16 +404,23 @@
             name: descriptor.type === "url" ? descriptor.url : "Saved source",
             warnings: [],
           };
+        } else {
+          extensionStates[key].descriptor = descriptor;
         }
         return extensionStates[key];
       }
 
       function allDescriptors() {
         var descriptors = localSources.map(function (entry) {
-          return { type: "source", key: entry.key, source: entry.source };
+          return { type: "source", key: entry.key, source: entry.source, mode: entry.mode };
         });
         (obj.extensions || []).forEach(function (url) {
-          descriptors.push({ type: "url", key: url, url: url });
+          descriptors.push({
+            type: "url",
+            key: url,
+            url: url,
+            mode: compatibilityURLs.indexOf(url) === -1 ? "strict" : "compatibility",
+          });
         });
         return descriptors;
       }
@@ -428,6 +467,12 @@
             text.appendChild(extensionId);
           }
           text.appendChild(source);
+          if (descriptor.mode === "compatibility") {
+            var compatibility = document.createElement("small");
+            compatibility.className = "extension-compatibility-status";
+            compatibility.textContent = "Compatibility mode: dynamic code and network-capable imports are allowed";
+            text.appendChild(compatibility);
+          }
 
           var badge = document.createElement("span");
           badge.className = "extension-badge";
@@ -467,6 +512,18 @@
               loadDescriptor(descriptor);
             });
             actions.appendChild(retry);
+            if (
+              descriptor.mode !== "compatibility" &&
+              /dynamic import\(\)|Dynamic code evaluation/i.test(state.error || "")
+            ) {
+              var compatibilityRetry = document.createElement("button");
+              compatibilityRetry.type = "button";
+              compatibilityRetry.textContent = "try compatibility mode";
+              compatibilityRetry.addEventListener("click", function () {
+                enableCompatibilityMode(descriptor);
+              });
+              actions.appendChild(compatibilityRetry);
+            }
           }
           var remove = document.createElement("button");
           remove.type = "button";
@@ -489,8 +546,12 @@
         renderExtensionList();
 
         var promise = descriptor.type === "url"
-          ? TurboWarpExtensionLoader.loadURL(descriptor.url, scratchblocks)
-          : TurboWarpExtensionLoader.loadSource(descriptor.source, scratchblocks);
+          ? TurboWarpExtensionLoader.loadURL(descriptor.url, scratchblocks, {
+              allowDynamicCode: descriptor.mode === "compatibility",
+            })
+          : TurboWarpExtensionLoader.loadSource(descriptor.source, scratchblocks, {
+              allowDynamicCode: descriptor.mode === "compatibility",
+            });
         return promise.then(function (result) {
           state.status = "loaded";
           state.id = result.id;
@@ -524,7 +585,12 @@
           }
         });
         (obj.extensions || []).forEach(function (url) {
-          var descriptor = { type: "url", key: url, url: url };
+          var descriptor = {
+            type: "url",
+            key: url,
+            url: url,
+            mode: compatibilityURLs.indexOf(url) === -1 ? "strict" : "compatibility",
+          };
           var state = ensureDescriptor(descriptor);
           if (state.status === "pending") loadDescriptor(descriptor);
         });
@@ -533,13 +599,65 @@
 
       function removeDescriptor(descriptor) {
         if (descriptor.type === "url") {
+          var previousCompatibilityURLs = compatibilityURLs;
+          compatibilityURLs = compatibilityURLs.filter(function (url) { return url !== descriptor.url; });
+          try {
+            writeCompatibilityURLs();
+          } catch (_error) {
+            compatibilityURLs = previousCompatibilityURLs;
+            setExtensionMessage("The compatibility preference could not be removed from browser storage.", true);
+            return;
+          }
           obj.extensions = obj.extensions.filter(function (url) { return url !== descriptor.url; });
           objUpdated();
         } else {
+          var previousLocalSources = localSources;
           localSources = localSources.filter(function (entry) { return entry.key !== descriptor.key; });
-          writeLocalSources();
+          try {
+            writeLocalSources();
+          } catch (_error) {
+            localSources = previousLocalSources;
+            setExtensionMessage("The saved source could not be removed from browser storage.", true);
+            return;
+          }
         }
         location.reload();
+      }
+
+      function enableCompatibilityMode(descriptor) {
+        var confirmed = window.confirm(
+          "Compatibility mode allows this extension to run dynamic imports and generated code. " +
+          "It remains isolated from this page, but it may make network requests. Continue?"
+        );
+        if (!confirmed) return;
+
+        if (descriptor.type === "url") {
+          if (compatibilityURLs.indexOf(descriptor.url) === -1) compatibilityURLs.push(descriptor.url);
+          try {
+            writeCompatibilityURLs();
+          } catch (_error) {
+            compatibilityURLs = compatibilityURLs.filter(function (url) { return url !== descriptor.url; });
+            setExtensionMessage("The compatibility preference could not be saved.", true);
+            return;
+          }
+        } else {
+          var entry = localSources.find(function (candidate) { return candidate.key === descriptor.key; });
+          if (!entry) return;
+          entry.mode = "compatibility";
+          try {
+            writeLocalSources();
+          } catch (_error) {
+            entry.mode = "strict";
+            setExtensionMessage("The compatibility preference could not be saved.", true);
+            return;
+          }
+        }
+
+        var compatibleDescriptor = Object.assign({}, descriptor, { mode: "compatibility" });
+        var state = ensureDescriptor(compatibleDescriptor);
+        state.status = "pending";
+        state.error = "";
+        loadDescriptor(compatibleDescriptor);
       }
 
       document.getElementById("extension-btn").addEventListener("click", function () {
@@ -580,11 +698,30 @@
           setExtensionMessage("That extension URL is already configured.", true);
           return;
         }
+        var compatibilityMode = document.getElementById("extension-url-compatibility").checked;
+        var previousCompatibilityURLs = compatibilityURLs.slice();
+        compatibilityURLs = compatibilityURLs.filter(function (savedURL) { return savedURL !== url.href; });
+        if (compatibilityMode) compatibilityURLs.push(url.href);
+        if (compatibilityURLs.join("\n") !== previousCompatibilityURLs.join("\n")) {
+          try {
+            writeCompatibilityURLs();
+          } catch (_error) {
+            compatibilityURLs = previousCompatibilityURLs;
+            setExtensionMessage("The compatibility preference could not be saved.", true);
+            return;
+          }
+        }
         obj.extensions.push(url.href);
         objUpdated();
         input.value = "";
+        document.getElementById("extension-url-compatibility").checked = false;
         setExtensionMessage("Extension URL added.");
-        loadDescriptor({ type: "url", key: url.href, url: url.href });
+        loadDescriptor({
+          type: "url",
+          key: url.href,
+          url: url.href,
+          mode: compatibilityMode ? "compatibility" : "strict",
+        });
       });
 
       document.getElementById("extension-add-source").addEventListener("click", function () {
@@ -603,6 +740,9 @@
             ? globalThis.crypto.randomUUID()
             : String(Date.now()),
           source: source,
+          mode: document.getElementById("extension-source-compatibility").checked
+            ? "compatibility"
+            : "strict",
         };
         try {
           localSources.push(entry);
@@ -613,8 +753,9 @@
           return;
         }
         input.value = "";
+        document.getElementById("extension-source-compatibility").checked = false;
         setExtensionMessage("Extension source saved.");
-        loadDescriptor({ type: "source", key: entry.key, source: entry.source });
+        loadDescriptor({ type: "source", key: entry.key, source: entry.source, mode: entry.mode });
       });
 
       updatedFromHash();

@@ -296,6 +296,7 @@
 
     self.onmessage = async function (event) {
       var source = event.data && event.data.source;
+      var allowDynamicCode = Boolean(event.data && event.data.allowDynamicCode);
       if (typeof source !== "string") {
         nativePostMessage({ ok: false, error: "Missing extension source" });
         return;
@@ -440,33 +441,35 @@
         });
         replaceGlobal("customElements", browserStubs.inert);
 
-        if (hasDynamicImport(source)) {
-          throw new Error("Network access is disabled while extracting extension metadata: dynamic import() is not supported");
+        if (!allowDynamicCode) {
+          if (hasDynamicImport(source)) {
+            throw new Error("Network access is disabled while extracting extension metadata: dynamic import() is not supported");
+          }
+          replaceGlobal("eval", denyDynamicCode);
+          replaceGlobal("Function", denyDynamicCode);
+          replaceGlobal("setTimeout", function (handler) {
+            if (typeof handler !== "function") return denyDynamicCode();
+            return nativeSetTimeout.apply(self, arguments);
+          });
+          replaceGlobal("setInterval", function (handler) {
+            if (typeof handler !== "function") return denyDynamicCode();
+            return nativeSetInterval.apply(self, arguments);
+          });
+          [
+            Object.getPrototypeOf(function () {}),
+            Object.getPrototypeOf(async function () {}),
+            Object.getPrototypeOf(function* () {}),
+            Object.getPrototypeOf(async function* () {}),
+          ].forEach(function (prototype) {
+            try {
+              Object.defineProperty(prototype, "constructor", {
+                configurable: true,
+                writable: false,
+                value: denyDynamicCode,
+              });
+            } catch (_error) {}
+          });
         }
-        replaceGlobal("eval", denyDynamicCode);
-        replaceGlobal("Function", denyDynamicCode);
-        replaceGlobal("setTimeout", function (handler) {
-          if (typeof handler !== "function") return denyDynamicCode();
-          return nativeSetTimeout.apply(self, arguments);
-        });
-        replaceGlobal("setInterval", function (handler) {
-          if (typeof handler !== "function") return denyDynamicCode();
-          return nativeSetInterval.apply(self, arguments);
-        });
-        [
-          Object.getPrototypeOf(function () {}),
-          Object.getPrototypeOf(async function () {}),
-          Object.getPrototypeOf(function* () {}),
-          Object.getPrototypeOf(async function* () {}),
-        ].forEach(function (prototype) {
-          try {
-            Object.defineProperty(prototype, "constructor", {
-              configurable: true,
-              writable: false,
-              value: denyDynamicCode,
-            });
-          } catch (_error) {}
-        });
 
         NativeFunction("Scratch", source)(Scratch);
         if (!registeredExtension) {
@@ -577,8 +580,9 @@
       });
   }
 
-  function extractInfo(source) {
+  function extractInfo(source, options) {
     assertSourceSize(source);
+    options = options || {};
     return new Promise(function (resolve, reject) {
       var blob = new Blob([workerSource], { type: "text/javascript" });
       var workerURL = URL.createObjectURL(blob);
@@ -609,7 +613,10 @@
       worker.onerror = function (event) {
         finish(new Error(event.message || "Extension metadata worker failed"));
       };
-      worker.postMessage({ source: source });
+      worker.postMessage({
+        source: source,
+        allowDynamicCode: Boolean(options.allowDynamicCode),
+      });
     });
   }
 
@@ -1101,17 +1108,17 @@
     };
   }
 
-  function loadSource(source, scratchblocks) {
-    return extractInfo(source)
+  function loadSource(source, scratchblocks, options) {
+    return extractInfo(source, options)
       .then(convertInfo)
       .then(function (converted) {
         return registerConverted(converted, scratchblocks);
       });
   }
 
-  function loadURL(url, scratchblocks) {
+  function loadURL(url, scratchblocks, options) {
     return fetchSource(url).then(function (source) {
-      return loadSource(source, scratchblocks);
+      return loadSource(source, scratchblocks, options);
     });
   }
 

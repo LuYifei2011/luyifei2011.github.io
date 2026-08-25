@@ -681,3 +681,22 @@ test("blocks string-generated code from recovering dynamic import", async () => 
     /Dynamic code evaluation is disabled/,
   );
 });
+
+test("compatibility mode permits dynamic code in the isolated worker", async () => {
+  const testWindow = createExtractionTestWindow();
+  const info = await testWindow.TurboWarpExtensionLoader.extractInfo(`
+    const makeName = Function("return 'Compatibility Mode'");
+    Scratch.extensions.register({
+      getInfo() {
+        return {
+          id: "compatibilitymode",
+          name: makeName(),
+          blocks: [{opcode: "run", blockType: Scratch.BlockType.COMMAND, text: "run"}]
+        };
+      }
+    });
+  `, {allowDynamicCode: true});
+
+  assert.equal(info.id, "compatibilitymode");
+  assert.equal(info.name, "Compatibility Mode");
+});
